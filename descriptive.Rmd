@@ -1,0 +1,608 @@
+---
+title: "Survey pre-test (Conducted April 2020)"
+author: "Isabel"
+date: "8/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(here)
+library(dplyr)
+library(tidyverse)
+library(stringi)
+library(mlogit)
+library(margins)
+library(cjoint)
+library(ggplot2)
+library(ggpubr)
+library(scales)
+library(likert)
+
+load(file="survey.rda")
+load(file="survey_long.rda")
+```
+
+## Sample breakdown
+
+Let's look at the profile of my pre-test sample, specifically: 1) age 2) gender 3) Education level 4) Religion 5) Ethnicity 6) First language 
+
+N=43 
+
+From the breakdown, we can see that the sample is not very representative of Kachin state, especially when it comes to age and education. This is not surprising since recruitment was primarily through a convenience sample tapping on my RAs' networks (which would tend to be younger and more highly educated). Consequently, the results from this survey should not seen as representative. 
+
+```{r, echo=FALSE, warning = FALSE}
+# plot for breakdown of age
+age_graph<-ggplot(survey, aes(x=Age, fill=Age)) + geom_bar(aes(y = (((..count..)/sum(..count..))*100))) + labs(y="percent", title="Breakdown by Age") +  theme(axis.title.x = element_blank(), legend.position = "none", plot.title=element_text(hjust=0.5, face="bold", size=16))+scale_fill_manual(name = "Age", values=c("grey37", "red4", "grey37", "grey37"))
+
+# pie chart for gender
+blank_theme <- theme_minimal()+
+  theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.ticks = element_blank(),
+  plot.title=element_text(size=16, face="bold", hjust=0.5)
+  )
+
+gender_graph<-ggplot(survey, aes(x=factor(1), fill=Gender)) + geom_bar(aes(y = (((..count..)/sum(..count..))*100))) +coord_polar("y")+ labs(y="percent", title="Breakdown by Gender") + blank_theme + theme(axis.text.x=element_blank())+scale_fill_manual(name = "Gender", values=c("red4", "grey37"))
+
+# breakdown for education level
+edu_graph<-ggplot(survey, aes(x=`Educaton level`, fill=`Educaton level`)) + geom_bar(aes(y=(((..count..)/sum(..count..))*100)),width=0.5) + scale_x_discrete(guide = guide_axis(n.dodge = 2))+ labs(y="percent", title="Breakdown by Education") + theme(legend.position = "none", plot.title=element_text(hjust=0.5, face="bold", size=16), axis.title.x = element_blank())+scale_fill_manual(name = "Education level", values=c("grey37", "red4"))
+
+#breakdown for first language
+firstlang<-survey%>%filter(!is.na(`First language`))%>%
+                             group_by(`First language`)%>%summarise(count=n())%>%
+  mutate(perc=count/sum(count))
+
+firstlang_graph<-ggplot(firstlang, aes(x=reorder(`First language`, perc), y=perc*100, fill=`First language`))+ geom_bar(stat='identity', position=position_dodge()) +labs(y="percent", title="Breakdown by 1st Language") +  theme(legend.position = "none", axis.title.y = element_blank(), plot.title=element_text(hjust=0.5, face="bold", size=16))+scale_fill_manual(name = "First language", values=c("grey37", "red4", "grey37", "grey37", "grey37", "grey37", "grey37", "grey37"))+coord_flip()
+
+# breakdown for religion
+survey$Religion<-as.factor(survey$Religion)
+survey$Religion<-relevel(survey$Religion, "Christian")
+
+religion_desc_graph<-ggplot(survey, aes(x=Religion, fill=Religion)) + geom_bar(aes(y = (((..count..)/sum(..count..))*100))) + labs(y="percent", title="Breakdown by Religion") +  theme(axis.title.x = element_blank(), legend.position = "none", plot.title=element_text(hjust=0.5, face="bold", size=16))+scale_fill_manual(name = "Age", values=c("red4", "grey37", "grey37", "grey37"))
+
+# table for ethnicity 
+survey[24,35]<-"Lhavao"
+
+ethnicity_long<-survey%>%filter(!is.na(Ethnicity))%>%group_by(Ethnicity)%>%summarise(count=n())%>%
+  mutate(perc=count/sum(count))
+
+# function for wrapping text
+# wrapper <- function(label, dev_width = dev.size("in")[1], dev_scaler = 10)  {   
+#   paste(strwrap(label, dev_width * dev_scaler), collapse = "\n") 
+# }
+
+ethnic_graph<-ethnicity_long%>%filter(perc>0.05)%>%ggplot(aes(x=reorder(Ethnicity, perc), y=perc*100, fill=Ethnicity))+geom_bar(stat='identity', position=position_dodge()) +labs(y="percent", title="Breakdown by Ethnicity") +  theme(legend.position = "none", axis.title.y = element_blank(), plot.title=element_text(hjust=0.5, face="bold", size=16), plot.caption=element_text(size=5))+scale_fill_manual(name = "Ethnicity", values=c("grey37", "red4", "grey37", "grey37", "grey37", "grey37"))+coord_flip()
+
+text<-paste("Other self-declared ethnicities with 1 count each", 
+            "includes 'Bamar', 'Gurkha', 'Jinghpaw Wunpawng'", 
+            "'Jinghpaw, Kachin', 'Kachin Chin Shan', 'Kachin Jinghpaw'", 
+            "'Lahpai', 'Maran', 'Naga', 'Rvwang (Kachin)' and 'Taileng'.", 
+            "Lahpai and Maran both refer to Kachin clan names, which", 
+            "may be due to the interpretation of the term myo-nweh-su", 
+            "used in the survey question.", sep=" ")
+text.p<-ggparagraph(text=text, face="italic", size = 6, color="black")
+
+desc<-ggarrange(age_graph, gender_graph, edu_graph, religion_desc_graph,ethnic_graph, firstlang_graph,text.p, ncol=2, nrow=2)
+
+desc[[1]]
+desc[[2]]
+
+```
+* Ethnicity was asked using a free-text response option. The translation for ethnicity needs to be rechecked. 'Lumyo' is more commonly understood as politically defined racial categories whereas 'myo nweh su' connotes some kind of ancestral lineage. In this case, the word 'myo nweh su' was used, which may explain why answers include Kachin subgroups and Kachin clan names. 
+
+## Survey Responses
+
+# Degree of closeness 
+
+We start off by first looking at the identity categories that respondents feel closest to. 
+
+The question got respondents to rank 6 categories according to their degree of closeness. They did not have to rank all 6 categories, just the ones that applied to them. Additionally, some respondents also ranked certain categories similarly. 
+
+The categories included: 
+
+- Their village/ward
+- Their linguistic group (defined by the language they indicated to be their first language)
+- Ethnic category of Kachin
+- Ethnic catgeory of Shan 
+- Kachin state
+- Myanmar 
+
+Perhaps as a consequence of the way the question was asked (in terms of closeness/sense of belonging), the category that was ranked #1 the most number of times was village/ward. What is notable, is that #2 is not the ethnic catgeory 'Kachin', but rather the respondents' first language, which usually corresponds to ethnic subgroups (For instance, with the Kachin category, linguistic subgroups include the Rawang, Lisu, Lhavao, Lachik and Jinghpaw).
+
+```{r, echo=FALSE, warning = FALSE}
+
+# make a long dataset 
+
+closeness<-survey[,44:49]
+closeness_long<-pivot_longer(closeness, cols=c("Closeness - Village/ward":"Closeness - Myanmar"),
+                           names_to = c(".value", "Entity"),
+                           names_sep = " - ",
+                           names_repair="minimal")
+
+closeness_long<-closeness_long%>%filter(!is.na(Closeness))%>%group_by(Entity, Closeness)%>%summarise(count=n())%>%mutate(count=count)
+
+first<-closeness_long%>%filter(Closeness==1)%>%ggplot(aes(x=reorder(Entity, -count), y=count, fill=Entity))+
+  geom_bar(stat='identity')+
+  labs(y="Count", title="Categories ranked first\n in terms of closeness")+ 
+  theme(legend.position = "none", axis.title.x = element_blank(), plot.title=element_text(hjust=0.5, face="bold", size=16))+ 
+  scale_x_discrete(guide = guide_axis(n.dodge = 2))+
+  scale_fill_manual(name = "First language", values=c("grey37", "grey37", "grey37", "grey37", "grey37", "red4"))
+
+second<-closeness_long%>%filter(Closeness==2)%>%ggplot(aes(x=reorder(Entity, -count), y=count, fill=Entity))+
+  geom_bar(stat='identity')+
+  labs(y="Count", title="Categories ranked second\n in terms of closeness")+
+  theme(legend.position = "none", axis.title.x = element_blank(), plot.title=element_text(hjust=0.5, face="bold", size=16))+ 
+  scale_x_discrete(guide = guide_axis(n.dodge = 2))+
+  scale_fill_manual(name = "First language", values=c("red4", "grey37", "grey37", "grey37", "grey37", "grey37"))
+
+closeness_graph<-ggarrange(first, second, ncol=2, nrow=1)
+
+closeness_graph
+
+```
+
+# Attitudes towards diversity
+
+We now look at attitudes towards diversity. In general, respondents were more likely to see people in Kachin state as sharing more similarities than differences despite their diversity as compared to the whole of Myanmar. 
+
+```{r, echo=FALSE, warning = FALSE}
+likert1<-survey[,58:59]
+
+likert1<-likert1%>%drop_na()
+
+likert1<-likert1%>%rename("Diversity_Myanmar"=`Because Myanmar is culturally diverse, we are very different from one another (4)`, "Diversity_Kachin"=`Because Kachin state is culturally diverse, we are very different from one another (4)`)
+
+likert_long<-pivot_longer(likert1, cols=c("Diversity_Myanmar", "Diversity_Kachin"),
+                          names_to=c(".value", "Place"),
+                                     names_sep = "_")
+
+likert_long<-likert_long%>%group_by(Place,Diversity)%>%
+  summarise(count=n())%>%mutate(perc=(count/29)*100)
+
+likert_long$perc<-as.numeric(likert_long$perc)
+likert_long$Diversity<-as.factor(likert_long$Diversity)
+likert_long$Place<-as.factor(likert_long$Place)
+likert_long$Place<-as.numeric(likert_long$Place)
+
+
+# items<-c("Even though Myanmar is very culturally diverse, we share many similarities with one another. ", "Even though Kachin state is very culturally diverse, we share many similarities with one another. ")
+
+# likert_long$Place<-as.character(likert_long$Place)
+# likert_long$Place[likert_long$Place=="Myanmar"]<-items[1]
+# likert_long$Place[likert_long$Place=="Kachin"]<-items[2]
+# likert_long$Place<-as.factor(likert_long$Place)
+# likert_long$Place<-as.ordered(likert_long$Place)
+
+lab1<-c("Even though Kachin state is very culturally diverse, we share many similarities with one another. ", "Even though Myanmar is very culturally diverse, we share many similarities with one another. ")
+lab2<-c("Because Kachin state is culturally diverse, we are very different from one another.","Because Myanmar is culturally diverse, we are very different from one another.")
+
+df1<-likert_long%>%filter(Diversity==14|Diversity==13)
+df2<-likert_long%>%filter(Diversity==12|Diversity==11)%>%mutate(perc=perc*-1)
+
+df1<-droplevels(df1)
+df2<-droplevels(df2)
+
+# df1$Place<-str_wrap(df1$Place, width=20)
+# df2$Place<-str_wrap(df2$Place, width=20)
+
+wrap.it <- function(x, len)
+{ 
+  sapply(x, function(y) paste(strwrap(y, len), 
+                              collapse = "\n"), 
+         USE.NAMES = FALSE)
+}
+
+wrap.labels <- function(x, len)
+{
+  if (is.list(x))
+  {
+    lapply(x, wrap.it, len)
+  } else {
+    wrap.it(x, len)
+  }
+}
+
+p<-ggplot() +
+  geom_bar(data=df1, aes(x = Place, y=perc, fill = factor(Diversity, levels=c(14, 13))),position="stack", stat="identity") +
+  geom_bar(data=df2, aes(x = Place, y=perc, fill = Diversity, order = as.numeric(Diversity)),position="stack", stat="identity") +
+  geom_hline(yintercept = 0, color =c("black"))+
+  theme_bw() + 
+    scale_x_continuous(breaks = 1:length(lab1), 
+                       labels=wrap.labels(lab1, 15),
+                     sec.axis=sec_axis(~., breaks = 1:length(lab2),
+                                       labels=wrap.labels(lab2,15)))+
+  coord_flip() +
+  guides(fill=guide_legend(title="",reverse=TRUE)) +
+  scale_fill_brewer(palette="OrRd", name="",labels=c("++","+","-","--")) +
+  labs(title=expression(atop(bold("Attitudes towards diversity"))),
+       y="percentages",x="") +  
+  expand_limits(y=c(-100,100), x=c(1,2))+
+  theme(legend.position="top",
+        axis.ticks = element_blank(),
+        plot.title = element_text(size=16, hjust = 0.5),
+        axis.title.y=element_text(size=8),
+        axis.text.y=element_text(size=8),
+        axis.title.x=element_text(size=8),
+        axis.text.x=element_text(size=8),
+        legend.title=element_text(size=14),
+        legend.text=element_text(size=12)
+  )
+
+# place=1: Kachin place=2: Myanmar
+
+annotated <- p + annotate("text", x=1, y=-100, label="89.6%") + annotate("text", x=1, y=100, label="10.4%") + annotate("text", x=2, y=-100, label="86.2%") + annotate("text", x=2, y=100, label="13.8%")
+
+annotated
+
+```
+
+90% of respondents agreed that Myanmar could benefit from having a diversity of ethnic groups compared to 85% of respondents for Kachin state. 
+
+```{r, echo=FALSE, warning = FALSE}
+
+# likert1<-as.data.frame(likert1)
+# 
+# Result=likert(likert1)
+# 
+# summary(Result)
+# 
+# plot(Result, type="bar", ylab.right=c("test", "test1"))
+
+benefit_diversity<-survey[,60:61]
+benefit_diversity[]<-lapply(benefit_diversity, factor)
+
+# Add missing empty level 
+benefit_diversity$`Myanmar can benefit from having a diversity of ethnic groups.`<-factor(benefit_diversity$`Myanmar can benefit from having a diversity of ethnic groups.`, levels=c(levels(benefit_diversity$`Myanmar can benefit from having a diversity of ethnic groups.`), "Strongly Disagree"))
+
+# Re-level the levels 
+benefit_diversity$`Myanmar can benefit from having a diversity of ethnic groups.`<-fct_relevel(benefit_diversity$`Myanmar can benefit from having a diversity of ethnic groups.`, c("Strongly Agree", "Somewhat Agree", "Somewhat Disagree", "Strongly Disagree")) 
+
+benefit_diversity$`Kachin state can benefit from having a diversity of ethnic groups.`<-fct_relevel(benefit_diversity$`Kachin state can benefit from having a diversity of ethnic groups.`, c("Strongly Agree", "Somewhat Agree", "Somewhat Disagree", "Strongly Disagree")) 
+
+# rename variables
+benefit_diversity<-rename(benefit_diversity, "benefit from diversity_Myanmar"=`Myanmar can benefit from having a diversity of ethnic groups.`,
+                          "benefit from diversity_Kachin"=`Kachin state can benefit from having a diversity of ethnic groups.`)
+
+# convert into long dataset
+
+benefit_diversity_long<-pivot_longer(benefit_diversity, cols=c(`benefit from diversity_Myanmar`,
+                                                               `benefit from diversity_Kachin`),
+                                     names_to = c(".value", "Place"),
+                                     names_sep = "_")
+
+benefit_diversity_long<-benefit_diversity_long%>%drop_na()
+
+benefit_diversity_cons<-benefit_diversity_long%>%  group_by(Place, `benefit from diversity`)%>%summarise(count=n())%>%
+  mutate(perc=count/sum(count))
+
+benefit_diversity_graph<- benefit_diversity_cons%>%
+  ggplot(aes(x=`benefit from diversity`, y=perc*100, fill=Place)) + geom_bar(stat='identity', position=position_dodge(), width=0.5)+ labs(y="percent", title="Myanmar/Kachin state can benefit \n from having a diversity of ethnic groups")+scale_x_discrete(guide = guide_axis(n.dodge = 2))+theme(axis.title.x = element_blank(), plot.title = element_text(size=16, hjust = 0.5))+scale_fill_manual(name = "Place", values=c("brown","aquamarine4"))
+
+benefit_diversity_graph
+
+```
+
+# Trust
+
+For this section, I filtered the dataset to only include respondents who are Kachin (excluding those who are mixed as well).
+
+I ask respondents how much they would trust someone from [a certain category]. In particular, I am interested in how respondents would respond when it comes to same/different ethnicities, and how this compares to those from the same village/ward as the respondent.
+
+87.5% of respondents are likely to trust a co-ethnic compared to 65% who are likely to trust a non-coethnic. This is in comparison to 80% of respondents who are likely to trust someone from the same village/ward.
+
+```{r, echo=FALSE, warning = FALSE}
+trust<-survey[,c(9,62:70)]
+trust<-rename(trust, "Trust_family"=`Trust - family`,
+              "Trust_village"=`Trust - ward/village`,
+              "Trust_samereligion"=`Trust - same religion`,
+              "Trust_diffreligion"=`Trust - different religion`,
+              "Trust_sameethnicity"=`Trust - same ethnicity`,
+              "Trust_diffethnicity"=`Trust - different ethnicity`,
+              "Trust_MMgovt"=`Trust - Myanmar government`,
+              "Trust_stategovt"=`Trust - Kachin state government`,
+              "Trust_Tatmadaw"=`Trust - Tatmadaw`,
+              )
+
+trust_long<-pivot_longer(trust, cols=c("Trust_family":"Trust_Tatmadaw"), 
+                         names_to = c(".value", "Entity"),
+                         names_sep = "_",
+                         names_repair="minimal")
+
+trust_long$Trust<-fct_relevel(trust_long$Trust, c("Do not trust at all", "Do not trust very much",
+                                                  "Trust somewhat", "Trust completely"))
+
+trust_long<-trust_long%>%drop_na()
+
+trust_cons<-trust_long%>%group_by(Entity, Trust)%>%summarise(count=n())%>%
+  mutate(perc=count/sum(count))
+
+# save(trust_cons, file="trust_cons")
+  
+# trust_cons%>%
+#   filter(Entity=="family"|Entity=="village"|Entity=="sameethnicity"|Entity=="diffethnicity"|Entity=="samereligion"|Entity=="diffreligion")%>%
+#   filter(!is.na(Trust))%>%
+#   ggplot(aes(x=Trust, y=perc*100, fill=Entity)) + geom_bar(stat='identity', position=position_dodge()) + labs(y="percent")
+
+# create multiple graphs in 1 plot
+
+family_village_graph<-trust_cons%>%
+  filter(Entity=="family"|Entity=="village")%>%
+  filter(!is.na(Trust))%>%
+  ggplot(aes(x=Trust, y=perc*100, fill=Entity)) + geom_bar(stat='identity', position=position_dodge())+ labs(y="percent")+scale_x_discrete(guide = guide_axis(n.dodge = 2))+theme(axis.title.x = element_blank())+scale_fill_manual(name = "Trust", values=c("brown","aquamarine4"))
+
+ethnicity_graph<-trust_cons%>%
+  filter(Entity=="village"|Entity=="sameethnicity"|Entity=="diffethnicity")%>%
+  filter(!is.na(Trust))%>%
+  ggplot(aes(x=Trust, y=perc*100, fill=Entity)) + geom_bar(stat='identity', position=position_dodge()) + labs(y="percent")+scale_x_discrete(guide = guide_axis(n.dodge = 2))+theme(axis.title.x = element_blank())+scale_fill_manual(name = "Trust", values=c("steelblue3","steelblue4","aquamarine4"))
+
+religion_graph<-trust_cons%>%
+  filter(Entity=="village"|Entity=="samereligion"|Entity=="diffreligion")%>%
+  filter(!is.na(Trust))%>%
+  ggplot(aes(x=Trust, y=perc*100, fill=Entity)) + geom_bar(stat='identity', position=position_dodge())+ labs(y="percent")+scale_x_discrete(guide = guide_axis(n.dodge = 2))+theme(axis.title.x = element_blank())+scale_fill_manual(name = "Trust", values=c("mediumpurple1","mediumpurple4","aquamarine4"))
+
+govt_graph<-trust_cons%>%
+  filter(Entity=="MMgovt"|Entity=="stategovt"|Entity=="Tatmadaw")%>%
+  filter(!is.na(Trust))%>%
+  ggplot(aes(x=Trust, y=perc*100, fill=Entity)) + geom_bar(stat='identity', position=position_dodge())+ labs(y="percent")+scale_x_discrete(guide = guide_axis(n.dodge = 2))+theme(axis.title.x = element_blank())+scale_fill_manual(name = "Trust", values=c("chocolate4","chocolate3", "chocolate1"))
+
+ggarrange(family_village_graph,ethnicity_graph,religion_graph, govt_graph,
+            labels = c("Village", "Ethnicity", "Religion", "Governments"), ncol=2, nrow=2)
+
+```
+
+I ask another question that aims to break down trust according to ethnic group. 
+
+Here, we can see very clearly that a much higher proportion of my respondents (who have been filtered to only include Kachin respondents) express more negative sentiments towards Bamar people compared to the other ethnicities.  
+
+```{r, echo=FALSE, warning = FALSE}
+# a dataset that only has Kachin people survey_Kachin
+
+survey_Kachin_only<-filter(survey, survey$Ethnicity!="Bamar"&survey$Ethnicity!="Gurkha"&
+                               survey$Ethnicity!="Kachin Bamar"&survey$Ethnicity!="Kachin Chin Shan"&survey$Ethnicity!="Taileng"&survey$Ethnicity!="Naga")
+
+trust_likert<-survey_Kachin_only[,71:74]
+
+trust_likert<-trust_likert%>%rename("Trust_Burmese"=`I can trust most Burmese people (4)`,
+                                    "Trust_Shan"=`I can trust most Shan people (4)`,
+                                    "Trust_Kachin"=`I can trust most Kachin people (4)`,
+                                    "Trust_Jinghpaw"=`I can trust most Jinghpaw people (4)`)
+
+trust_likert_long<-pivot_longer(trust_likert, cols=c("Trust_Burmese", "Trust_Shan", "Trust_Kachin", "Trust_Jinghpaw"),
+                              names_to=c(".value", "Ethnicity"),
+                              names_sep="_")
+
+trust_likert_long<-trust_likert_long%>%filter(!is.na(Trust))%>%add_count(Ethnicity)
+
+trust_likert_long<-trust_likert_long%>%group_by(Ethnicity, Trust)%>%
+  summarise(count=n()/n)%>%distinct()
+
+trust_likert_long$count<-as.numeric(trust_likert_long$count)
+trust_likert_long$Trust<-as.factor(trust_likert_long$Trust)
+trust_likert_long$Ethnicity<-as.factor(trust_likert_long$Ethnicity)
+trust_likert_long$Ethnicity<-as.numeric(trust_likert_long$Ethnicity)
+
+# 1 = Burmese, 2= JP, 3=KC, 4=Shan
+            
+# items<-c("Even though Myanmar is very culturally diverse, we share many similarities with one another. ", "Even though Kachin state is very culturally diverse, we share many similarities with one another. ")
+
+# likert_long$Place<-as.character(likert_long$Place)
+# likert_long$Place[likert_long$Place=="Myanmar"]<-items[1]
+# likert_long$Place[likert_long$Place=="Kachin"]<-items[2]
+# likert_long$Place<-as.factor(likert_long$Place)
+# likert_long$Place<-as.ordered(likert_long$Place)
+
+lab1<-c("Most Burmese people will try to take advantage of me if they have a chance.", "Most Jinghpaw people will try to take advantage of me if they have a chance.", "Most Kachin people will try to take advantage of me if they have a chance.", "Most Shan people will try to take advantage of me if they have a chance.")
+lab2<-c("I can trust most Burmese people.","I can trust most Jinghpaw people.", "I can trust most Kachin people.", "I can trust most Shan people.")
+
+df1<-trust_likert_long%>%filter(Trust==14|Trust==13)
+df2<-trust_likert_long%>%filter(Trust==12|Trust==11)%>%mutate(count=count*-1)
+
+# df1<-droplevels(df1)
+# df2<-droplevels(df2)
+
+# df1$Place<-str_wrap(df1$Place, width=20)
+# df2$Place<-str_wrap(df2$Place, width=20)
+
+p<-ggplot() +
+  geom_bar(data=df1, aes(x = Ethnicity, y=count*100, fill = factor(Trust, levels=c(14, 13))),position="stack", stat="identity") +
+  geom_bar(data=df2, aes(x = Ethnicity, y=count*100, fill = Trust, order = as.numeric(Trust)),position="stack", stat="identity") +
+  geom_hline(yintercept = 0, color =c("black"))+
+  theme_bw() + 
+    scale_x_continuous(breaks = 1:length(lab1), 
+                       labels=wrap.labels(lab1, 15),
+                     sec.axis=sec_axis(~., breaks = 1:length(lab2),
+                                       labels=wrap.labels(lab2,15)))+
+  coord_flip() +
+  guides(fill=guide_legend(title="",reverse=TRUE)) +
+  scale_fill_brewer(palette="OrRd", name="",labels=c("--","-","+","++")) +
+  labs(title=expression(atop(bold("Attitudes towards other ethnicities"))),
+       y="percentages",x="") +  
+  expand_limits(y=c(-100,100), x=c(1,2))+
+  theme(legend.position="top",
+        axis.ticks = element_blank(),
+        plot.title = element_text(size=16, hjust = 0.5),
+        axis.title.y=element_text(size=7),
+        axis.text.y=element_text(size=7),
+        axis.title.x=element_text(size=8),
+        axis.text.x=element_text(size=8),
+        legend.title=element_text(size=14),
+        legend.text=element_text(size=12)
+  )
+
+annotated_1 <- p + annotate("text", x=1, y=-100, label="75.9%") + annotate("text", x=1, y=100, label="24.1%") + annotate("text", x=2, y=-100, label="29.2%") + annotate("text", x=2, y=100, label="70.8%") + annotate("text", x=3, y=-100, label="34.5%") + annotate("text", x=3, y=100, label="65.5%") + annotate("text", x=4, y=-100, label="37.9%") + annotate("text", x=4, y=100, label="62.1%") 
+
+annotated_1
+```
+
+I look at attitudes towards whether people of different ethnicities can live together. Once again, a higher proportion of negative sentiments were expressed towards Bamars (see the height of the red bars). 
+
+```{r, echo=FALSE, warning = FALSE}
+
+live_tgt<-survey_Kachin_only[,78:80]
+
+live_tgt<-rename(live_tgt, "live tgt_Kachin and Shan people"=`Kachin and Shan people can never live together because they are too different.`,
+                 "live tgt_Kachin and Bamar people"=`Kachin and Burmese people can never live together because they are too different.`,
+                 "live tgt_Shan and Bamar people"=`Shan and Burmese people can never live together because they are too different.`)
+
+live_tgt_long<-pivot_longer(live_tgt, cols=c("live tgt_Kachin and Shan people", "live tgt_Kachin and Bamar people", "live tgt_Shan and Bamar people"),
+                            names_to = c(".value", "Ethnicities"),
+                            names_sep = "_")
+
+live_tgt_long<-live_tgt_long%>%drop_na()
+
+live_tgt_long$`live tgt`<-fct_relevel(live_tgt_long$`live tgt`, c("Strongly Agree", "Somewhat Agree", "Somewhat Disagree", "Strongly Disagree")) 
+
+live_tgt_long<-live_tgt_long%>%group_by(Ethnicities, `live tgt`)%>%summarise(count=n())%>%
+  mutate(perc=count/sum(count))
+
+live_tgt_graph<-live_tgt_long%>%  ggplot(aes(x=Ethnicities, y=perc*100, fill=`live tgt`)) + geom_bar(stat='identity', position=position_dodge(), width=0.5)+ labs(y="percent", title="Group A and Group B can never live \n together because they are too different")+scale_x_discrete(guide = guide_axis(n.dodge = 2))+theme(axis.title.x = element_blank(), plot.title = element_text(size=16, hjust = 0.5))+scale_fill_manual(name = "Sentiment", values=c("brown4", "brown3", "turquoise3", "turquoise4"))
+
+live_tgt_graph
+
+```
+
+I now look at my conjoint experiment. 
+
+We can see that the AMCE coefficients are statistically significant for Shan ethnicity (reference category: Bamar), Hometown and Religion. The AMCE tells me the marginal effect of attribute averaged over the joint distribution of the remaining attributes.
+
+```{r, echo=FALSE, warning = FALSE}
+
+attribute_list <- list()
+attribute_list[["cEthnicity"]] <- c("Kachin", "Bamar", "Shan")
+attribute_list[["cHometown"]] <- c("Waingmaw", "Hlegu")
+attribute_list[["cReligion"]] <- c("Christian", "Buddhist")
+attribute_list[["cOcc"]] <- c("Farmer", "Vendor")
+attribute_list[["cEdu"]] <- c("Primary", "Secondary")
+attribute_list[["cLanguage"]] <- c("Bamar", "Jinghpaw and Shan and Bamar", "Jinghpaw and Bamar", "Shan and Bamar")
+
+constraint_list<-list()
+
+# constraints on ethnicity, region and languages understood
+
+constraint_list[[1]]<- list()
+constraint_list[[1]][["cEthnicity"]]<-c("Kachin")
+constraint_list[[1]][["cHometown"]] <- c("Waingmaw")
+constraint_list[[1]][["cLanguage"]] <- c("Bamar", "Shan and Bamar")
+
+constraint_list[[2]]<- list()
+constraint_list[[2]][["cEthnicity"]]<-c("Kachin")
+constraint_list[[2]][["cHometown"]] <- c("Hlegu")
+constraint_list[[2]][["cLanguage"]] <- c("Shan and Bamar", "Jinghpaw and Shan and Bamar")
+
+constraint_list[[3]]<- list()
+constraint_list[[3]][["cEthnicity"]]<-c("Shan")
+constraint_list[[3]][["cHometown"]] <- c("Waingmaw")
+constraint_list[[3]][["cLanguage"]] <- c("Jinghpaw and Bamar", "Bamar")
+
+constraint_list[[4]]<- list()
+constraint_list[[4]][["cEthnicity"]]<-c("Shan")
+constraint_list[[4]][["cHometown"]] <- c("Hlegu")
+constraint_list[[4]][["cLanguage"]] <- c("Jinghpaw and Bamar", 
+                                        "Jinghpaw and Shan and Bamar")
+
+constraint_list[[5]]<- list()
+constraint_list[[5]][["cEthnicity"]]<-c("Bamar")
+constraint_list[[5]][["cHometown"]] <- c("Hlegu")
+constraint_list[[5]][["cLanguage"]] <- c("Jinghpaw and Bamar","Jinghpaw and Shan and Bamar", "Shan and Bamar")
+
+surveydesign<-makeDesign(type="constraints", attribute.levels=attribute_list,
+                         constraints=constraint_list)
+
+# create correct dataframe for cjoint package
+
+survey_cjoint<-survey_long%>%mutate(cEthnicity = case_when(Name=="Lahpai Zau Lat"|Name=="Maran Naw Seng" ~ "Kachin",
+                                                           Name=="Sai Maung Maung"|Name=="Sai Soe Win" ~ "Shan",
+                                                           Name== "Aung Min Oo"|Name=="Aung Kyaung Ko"  ~ "Bamar"))%>%
+  mutate(cHometown = case_when(Hometown=="Hlegu, Yangon" ~ "Hlegu",
+                                                          Hometown=="Waingmaw, Kachin" ~ "Waingmaw"))%>%
+  rename("cReligion" = indvlReligion)%>%
+  rename("cOcc" = occ)%>%
+  mutate(cEdu = case_when(edu=="primary sch" ~ "Primary",
+                            edu=="secondary sch" ~ "Secondary"))%>%
+  mutate(cLanguage = case_when(Shan==1 & JP==1 ~ "Jinghpaw and Shan and Bamar",
+                               Shan==1 & JP==0 ~ "Shan and Bamar",
+                               Shan==0 & JP==1 ~ "Jinghpaw and Bamar",
+                               Shan==0 & JP==0 ~ "Bamar"))
+
+cols=c("cEthnicity", "cHometown", "cReligion","cOcc", "cEdu", "cLanguage")
+survey_cjoint[cols]<-lapply(survey_cjoint[cols], factor)
+
+survey_cjoint<-rename(survey_cjoint, "state"=`Which state/region were you born in? `)
+survey_cjoint<-survey_cjoint%>%filter(state!="Yangon region")
+
+survey_cjoint$Jinghpaw<-ifelse(grepl("Jinghpaw", survey_cjoint$Ethnicity)|survey_cjoint$Ethnicity=="Kachin"&survey_cjoint$`First language`!="Rawang"|survey_cjoint$Ethnicity=="Lahpai", 1,0)
+
+survey_cjoint$Jinghpaw<-replace_na(survey_cjoint$Jinghpaw,1)
+survey_cjoint$Jinghpaw<-as.factor(survey_cjoint$Jinghpaw)
+
+results<-amce(selected~ cEthnicity  + cHometown + cReligion + cOcc + cEdu + cLanguage, data=survey_cjoint, respondent.id = "`Response ID`", cluster=TRUE, design=surveydesign)
+
+summary(results)
+
+plot(results, main="AMCE of trust", xlab = "Change in e[Y]", ci=0.95, plot.display="all")
+
+```
+
+I interact the attributes with the respondents' characteristics, in particular, focusing on those who are Jinghpaw. When an individual is Jinghpaw, Shan ethniity, hometown and religion are statistically significant. When an individual is non-Jinghpaw, none of the attributes are statistically significant.
+
+```{r, echo=FALSE, warning = FALSE}
+# Interaction effect with Jinghpaw individuals 
+
+results1<-amce(selected~ Jinghpaw*cEthnicity + Jinghpaw*cHometown + Jinghpaw*cReligion + Jinghpaw*cOcc + Jinghpaw*cEdu + Jinghpaw*cLanguage, data=survey_cjoint, respondent.id = "`Response ID`", cluster=TRUE, respondent.varying="Jinghpaw", design=surveydesign)
+
+summary(results1)
+
+plot(results1, main="AMCE of trust", xlab = "Change in e[Y]", ci=0.95, plot.display="interaction")
+```
+
+I also interact with the hometown. When the profile shown is not from Kachin state, ethnicity does not matter in determining whether or not the profile is trustworthy. When the profile is from Kachin state, ethnicity matters.  
+
+```{r, echo=FALSE, warning = FALSE}
+# Interaction effect with Hometown
+
+baselines<-list()
+baselines$cEthnicity<-"Kachin"
+survey_cjoint$conjoint.Waingmaw<-as.factor(survey_cjoint$conjoint.Waingmaw)
+
+results2<-amce(selected~ cEthnicity + conjoint.Waingmaw*cEthnicity + cHometown + cReligion + cOcc + cEdu + cLanguage, data=survey_cjoint, respondent.id = "`Response ID`", baselines = baselines, cluster=TRUE, respondent.varying="conjoint.Waingmaw", design=surveydesign)
+
+summary(results2)
+
+plot(results2, main="AMCE of trust", xlab = "Change in e[Y]", ci=0.95, plot.display="interaction")
+
+# survey_cjoint%>%select(c("set", "alt", "conjoint.Waingmaw", "selected", "cHometown", "cEthnicity"))%>%View()
+
+results3<-amce(selected~ conjoint.Waingmaw*cEthnicity + conjoint.Waingmaw*cReligion + conjoint.Waingmaw*cOcc + conjoint.Waingmaw*cEdu + conjoint.Waingmaw*cLanguage, data=survey_cjoint, respondent.id = "`Response ID`", baselines = baselines, cluster=TRUE, respondent.varying="conjoint.Waingmaw", design=surveydesign)
+
+plot(results3, main="AMCE of trust", xlab = "Change in e[Y]", ci=0.95, plot.display="interaction")
+```
+
+Finally, I include an interaction for whether the profile provided is of the same ethnicity as the respondent. When the profile provided is of a non-coethnic, religion and language spoken matters. When the profile provided is of a coethnic, hometown matters.  
+
+```{r, echo=FALSE, warning = FALSE}
+# Interaction effect with co-ethnicity
+survey_Kachin<-filter(survey_cjoint, survey_cjoint$Ethnicity!="Bamar"&survey_cjoint$Ethnicity!="Gurkha"&
+                               survey_cjoint$Ethnicity!="Kachin Bamar"&survey_cjoint$Ethnicity!="Kachin Chin Shan"&survey_cjoint$Ethnicity!="Taileng"&survey_cjoint$Ethnicity!="Naga")
+
+# table(survey_Kachin$Ethnicity)
+
+survey_Kachin$coethnic<-ifelse(survey_Kachin$cEthnicity=="Kachin",1,0)
+
+survey_Kachin$coethnic<-as.factor(survey_Kachin$coethnic)
+
+results4<-amce(selected~ coethnic*cEthnicity + coethnic*cHometown + coethnic*cReligion + coethnic*cOcc + coethnic*cEdu + coethnic*cLanguage, data=survey_Kachin, respondent.id = "`Response ID`", baselines = baselines, cluster=TRUE, respondent.varying="coethnic", design=surveydesign)
+
+summary(results4)
+
+plot(results4, main="AMCE of trust", xlab = "Change in e[Y]", ci=0.95, plot.display="interaction")
+```
+
+
+
+
